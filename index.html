@@ -8,7 +8,7 @@
     <!-- Bootstrap 5 CSS (CDN) -->
     <link href="http://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="http://getbootstrap.com/docs/5.3/assets/css/docs.css" rel="stylesheet">
-    <title>Bootstrap Example</title>
+    <title>Local LLM Chat</title>
     <script src="http://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
     <script src="http://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
@@ -26,7 +26,11 @@
 
     <script src="http://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 
-    <title>Local LLM</title>
+    <style>
+        .fs-xs {
+            font-size: 0.75rem;
+        }
+    </style>
 
 </head>
 
@@ -37,7 +41,7 @@
         </h1>
         <div id="errorBanner" class="alert alert-danger text-center" style="display: none;">
         </div>
-    
+
         <!-- Model Dropdown in the Top Right Corner -->
         <div class="dropdown position-absolute top-0 end-0 mt-4 me-4">
             <button class="btn btn-outline-primary dropdown-toggle" type="button" id="modelDropdown"
@@ -51,15 +55,23 @@
                         replaced with the list below</a></li>
             </ul>
         </div>
+
         <label>System Prompt</label>
         <input type="text" id="sysPromptInput" class="form-control form-control-lg mt-4" />
 
-        <div id="resultContainer" class="mt-3 h-48 overflow-auto">
+        <div id="resultContainer" class="mt-3 h-48">
             <p class="text-muted small mb-2"></p>
-            <div id="resultText"></div>
+            <div id="resultText" class="mt-3 overflow-auto" style="max-height: 400px;"></div>
         </div>
+
         <input type="text" id="userPromptInput" class="form-control form-control-lg mt-4"
-            placeholder="How can I help you..." />
+            placeholder="How can I help you..." value="Write a story" />
+
+        <!-- Token Rate Status Bar -->
+        <div class="d-flex justify-content-end align-items-center mt-2">
+            <span class="ms-2 fs-xs" id="tokensStatus"></span>
+        </div>
+
         <div class="d-flex justify-content-center mt-4">
             <button id="generateBtn"
                 class="btn btn-dark btn-lg w-50 mr-2 disabled-opacity-75 disabled:cursor-not-allowed">
@@ -74,272 +86,303 @@
             </button>
         </div>
     </div>
+</body>
 
-    <script>
+<script>
 
-        const MODELS_JSON_URL = "http://localhost:11434/api/tags";
-        const API_URL = "http://127.0.0.1:11434/api/chat";//"https://api.openai.com/v1/chat/completions"; //use this if you choose to use an OpenAI model
-        const userPromptInput = document.getElementById("userPromptInput");
-        const generateBtn = document.getElementById("generateBtn");
-        const stopBtn = document.getElementById("stopBtn");
-        const resultText = document.getElementById("resultText");
-        const clearBtn = document.getElementById("clearBtn");
-        const modelDropdownBtn = document.getElementById("modelDropdown"); // Dropdown button element
-        const sysPrompt = document.getElementById("sysPromptInput");
+    const MODELS_JSON_URL = "http://localhost:11434/api/tags";
+    const API_URL = "http://127.0.0.1:11434/api/chat";//"https://api.openai.com/v1/chat/completions"; //use this if you choose to use an OpenAI model
+    const userPromptInput = document.getElementById("userPromptInput");
+    const generateBtn = document.getElementById("generateBtn");
+    const stopBtn = document.getElementById("stopBtn");
+    const resultText = document.getElementById("resultText");
+    const clearBtn = document.getElementById("clearBtn");
+    const modelDropdownBtn = document.getElementById("modelDropdown"); // Dropdown button element
+    const sysPrompt = document.getElementById("sysPromptInput");
+    const tokensStatus = document.getElementById("tokensStatus");
 
-        let selectedModel = ""; // one of the fastest "granite3.1-moe:3b-instruct-q8_0"
+    let selectedModel = ""; // one of the fastest "granite3.1-moe:3b-instruct-q8_0"
 
-        let models = {};
+    let models = {};
 
-        async function fetchModels() {
-            try {
-                const response = await fetch(MODELS_JSON_URL);
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                models = await response.json();
-                if (!models.models.length)
-                    displayError("No Ollama models may be installed. Please install Ollama and pull atleast one LLM model.");
-            } catch (error) {
-                console.error("Error fetching models:", error);
-                models = {};
+    async function fetchModels() {
+        try {
+            const response = await fetch(MODELS_JSON_URL);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
+            models = await response.json();
+            if (!models.models.length)
+                displayError("No Ollama models may be installed. Please install Ollama and pull atleast one LLM model.");
+        } catch (error) {
+            console.error("Error fetching models:", error);
+            models = {};
         }
+    }
 
 
-        function onContentLoaded() {
-            sysPrompt.value = "You will only answer questions that pertain to Python programming language. And politely decline to say anything other than that.";
+    function onContentLoaded() {
+        sysPrompt.value = "you are a story writer";//"You will only answer questions that pertain to Python programming language. And politely decline to say anything other than that.";
 
-            // if (!mdls) {
-            //     alert("No models installed. Use: ollama pull <model name>");
-            //     return;
-            // }
+        fetchModels().then(() => {
+            selectedModel = "granite3.1-moe:3b-instruct-q8_0";//firstModelKey?.name;
+            modelDropdownBtn.textContent = selectedModel;
+            populateDropdown2();
+        });
+    }
 
-            // const firstModelKey = mdls.models[0];
-            //updateModel(selectedModel);
-            fetchModels().then(() => {
-                //selectedModel = "granite3.1-moe:3b-instruct-q8_0";//firstModelKey?.name;
-                modelDropdownBtn.textContent = selectedModel;
-                populateDropdown2();
-            });
-        }
+    function populateDropdown2() {
+        const dropdownMenu = document.querySelector(".dropdown-menu");
+        dropdownMenu.innerHTML = "";
 
-        function populateDropdown2() {
-            const dropdownMenu = document.querySelector(".dropdown-menu");
-            dropdownMenu.innerHTML = "";
+        models.models.forEach(model => {
+            const listItem = document.createElement("li");
+            listItem.role = "presentation";
 
-            models.models.forEach(model => {
-                const listItem = document.createElement("li");
-                listItem.role = "presentation";
+            const anchor = document.createElement("a");
+            anchor.href = "#";
+            anchor.className = "dropdown-item";
+            anchor.setAttribute("role", "menuitem");
+            //anchor.setAttribute("data-model", key);
+            anchor.textContent = model.name;
 
-                const anchor = document.createElement("a");
-                anchor.href = "#";
-                anchor.className = "dropdown-item";
-                anchor.setAttribute("role", "menuitem");
-                //anchor.setAttribute("data-model", key);
-                anchor.textContent = model.name;
-
-                listItem.appendChild(anchor);
-                dropdownMenu.appendChild(listItem);
-            });
-
-            document.querySelectorAll(".dropdown-item").forEach(item => {
-                item.addEventListener("click", (e) => {
-                    e.preventDefault();
-                    selectedModel = e.target.textContent;
-                    modelDropdownBtn.textContent = selectedModel;
-
-                    //  updateModel(selectedModel);
-                });
-            });
-
-        }
-
-        let controller = null; // Store the AbortController instance
-
-        const scrollToBottom = () => {
-            window.scrollTo(0, document.body.scrollHeight);
-        };
-
-        const generate = async () => {
-            // Alert the user if no prompt value
-            if (!userPromptInput.value) {
-                alert("Please enter a prompt.");
-                return;
-            }
-            if (!models.models.length){
-                    displayError("No Ollama models may be installed. Please install Ollama and pull atleast one LLM model.");
-                    return;
-                }
-            // Disable the generate button and enable the stop button
-            generateBtn.disabled = true;
-            stopBtn.disabled = false;
-            resultText.innerText = "Generating...";
-
-            // Create a new AbortController instance
-            controller = new AbortController();
-            const signal = controller.signal;
-            try {
-
-                const messages = [
-                    { role: 'system', content: sysPrompt.value },
-                    { role: "user", content: userPromptInput.value },
-                ];
-
-                await streamCompletionFromLocalLLM(messages, selectedModel, resultText);
-            } catch (error) {
-                resultText.innerText = "Error occurred while generating. " + error;
-            } finally {
-                // Enable the generate button and disable the stop button
-                generateBtn.disabled = false;
-                stopBtn.disabled = true;
-                controller = null; // Reset the AbortController instance                
-            }
-        };
-
-        const clear = () => {
-            resultText.innerText = ""; // Clear the result text
-            userPromptInput.value = ""; // Clear the prompt input field
-        };
-
-        const stop = () => {
-            // Abort the fetch request by calling abort() on the AbortController instance
-            if (controller) {
-                controller.abort();
-                controller = null;
-            }
-        };
-
-        userPromptInput.addEventListener("keyup", (event) => {
-            if (event.key === "Enter") {
-                generate();
-            }
+            listItem.appendChild(anchor);
+            dropdownMenu.appendChild(listItem);
         });
 
-        generateBtn.addEventListener("click", generate);
-        stopBtn.addEventListener("click", stop);
-        clearBtn.addEventListener("click", clear);
+        document.querySelectorAll(".dropdown-item").forEach(item => {
+            item.addEventListener("click", (e) => {
+                e.preventDefault();
+                selectedModel = e.target.textContent;
+                modelDropdownBtn.textContent = selectedModel;
 
-        document.addEventListener("DOMContentLoaded", onContentLoaded);
+                //  updateModel(selectedModel);
+            });
+        });
 
-        async function streamCompletionFromLocalLLM(messages, model, resultText) {
-            const apiUrl = API_URL;
+    }
 
-            if (!resultText) {
-                console.error("result element not found");
-                return;
-            }
+    let controller = null; // Store the AbortController instance
 
-            resultText.innerText = "";
+    const scrollToBottom = () => {
+        //window.scrollTo(0, document.body.scrollHeight);
+        const resultText = document.getElementById("resultText");
+        if (resultText) {
+            resultText.scrollTop = resultText.scrollHeight;
+        }
+    };
 
-            const requestBody = {
-                messages: messages,
-                model: model
-            };
+    // Define a context array to hold all conversation turns
+    let conversationContext = [];
 
-            generateBtn.disabled = true;
-            stopBtn.disabled = false;
-            resultText.innerText = "Generating...";
+    // Function to add message to context
+    function addMessageToContext(role, content) {
+        conversationContext.push({ role, content });
+    }
 
-            // Create a new AbortController instance
-            controller = new AbortController();
-            const signal = controller.signal;
+    // Function to reset the context (used when clearing the conversation)
+    function resetContext() {
+        // Optionally start new conversation with an overarching system prompt
+        conversationContext = [
+            { role: "system", content: sysPrompt.value || "You are a helpful assistant." }
+        ];
+    }
 
-            try {
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(requestBody),
-                    signal,
-                });
+    // Initialize the context on page load
+    resetContext();
 
-                if (!response.ok) {
-                    try {
-                        const errorData = await response.json();
-                        resultText.innerText = `Server Error: ${errorData.error || JSON.stringify(errorData)}`;
-                        return;
-                    } catch (jsonError) {
-                        resultText.innerText = `HTTP error! status: ${response.status}. Could not parse server error.`;
-                        return;
-                    }
-                } else {
+    async function generate() {
+        // Alert the user if no prompt value
+        if (!userPromptInput.value) {
+            alert("Please enter a prompt.");
+            return;
+        }
+        if (!models.models.length) {
+            displayError("No Ollama models may be installed. Please install Ollama and pull at least one LLM model.");
+            return;
+        }
+        // Disable the generate button and enable the stop button
+        generateBtn.disabled = true;
+        stopBtn.disabled = false;
+        if (resultText.innerText.length == 0)
+            resultText.innerText = " Generating...";
+
+        // Add user message to context
+        addMessageToContext("user", userPromptInput.value);
+
+        try {
+            await streamCompletionFromLocalLLM(conversationContext, selectedModel, resultText);
+        } catch (error) {
+            resultText.innerText += " Error occurred while generating. " + error;
+        } finally {
+            // Enable the generate button and disable the stop button
+            generateBtn.disabled = false;
+            stopBtn.disabled = true;
+            controller = null; // Reset the AbortController instance
+        }
+    }
+
+    const clear = () => {
+        resultText.innerText = ""; // Clear the result text
+        userPromptInput.value = ""; // Clear the prompt input field
+        resetContext(); // Reset the conversation context
+    };
+
+    const stop = () => {
+        // Abort the fetch request by calling abort() on the AbortController instance
+        if (controller) {
+            controller.abort();
+            controller = null;
+        }
+    };
+
+    userPromptInput.addEventListener("keyup", (event) => {
+        if (event.key === "Enter") {
+            generate();
+        }
+    });
+
+    generateBtn.addEventListener("click", generate);
+    stopBtn.addEventListener("click", stop);
+    clearBtn.addEventListener("click", clear);
+
+    document.addEventListener("DOMContentLoaded", onContentLoaded);
+
+    async function streamCompletionFromLocalLLM(messages, model, resultText) {
+        const apiUrl = API_URL;
+
+        if (!resultText) {
+            console.error("result element not found");
+            return;
+        }
+
+        //resultText.innerText = "";
+
+        const requestBody = {
+            messages: messages,
+            model: model,
+            // "options": {
+            //     "num_ctx": 32768
+            // }
+        };
+
+        generateBtn.disabled = true;
+        stopBtn.disabled = false;
+        if (resultText.innerText.length == 0)
+            resultText.innerText = " Generating...";
+
+        // Create a new AbortController instance
+        controller = new AbortController();
+        const signal = controller.signal;
+
+        try {
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestBody),
+                signal,
+            });
+
+            if (!response.ok) {
+                try {
+                    const errorData = await response.json();
+                    resultText.innerText += `Server Error: ${errorData.error || JSON.stringify(errorData)}`;
+                    return;
+                } catch (jsonError) {
+                    resultText.innerText += `HTTP error! status: ${response.status}. Could not parse server error.`;
+                    return;
+                }
+            } else {
+                if (resultText.innerText == "Generating...") {
                     resultText.innerText = "";
-                }
-
-                const reader = response.body.getReader();
-                const decoder = new TextDecoder();
-
-                let startTime = performance.now();
-                let totalTokens = 0;
-
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-
-                    const chunk = decoder.decode(value);
-                    const lines = chunk.split('\n');
-
-                    for (const line of lines) {
-                        if (!line.trim()) continue;
-
-                        try {
-                            const parsed = JSON.parse(line);
-                            const token = parsed.message?.content || '';
-
-                            if (token) {
-                                resultText.innerText += token;
-                                totalTokens++;
-                                scrollToBottom();
-                            }
-                        } catch (e) {
-                            console.error("JSON Parse Error:", e.message, "Line:", line);
-                            resultText.innerText += "[JSON Parse Error]";
-                        }
-                    }
-                }
-
-                const endTime = performance.now();
-                const elapsedTime = (endTime - startTime) / 1000; // in seconds
-                const tokenRate = (totalTokens / elapsedTime).toFixed(2); // Tokens per second
-
-                resultText.innerText += `\n\nTotal Tokens: ${totalTokens}`;
-                resultText.innerText += `\nToken Rate: ${tokenRate} t/sec`;
-
-            } catch (error) {
-                //console.error("Error fetching completion:", error);
-                if (signal.aborted) {
-                    resultText.innerText += "...Request aborted.";
-                } else {
-                    if (error instanceof TypeError && error.message === "Failed to fetch") {
-                        console.error("Network error. Check your connection.");
-                        resultText.innerText = "Network error. Please check your connection and try again.";
-                    } else if (error instanceof TypeError && error.message.includes("CORS")) {
-                        console.error("CORS Error. Check your server configuration.");
-                        resultText.innerText = "CORS error. Please check your server configuration.";
-                    } else {
-                        resultText.innerText = `Error: ${error.message || "An unknown error occurred."}`;
-                    }
-                }
-            } finally {
-                // Enable the generate button and disable the stop button
-                generateBtn.disabled = false;
-                stopBtn.disabled = true;
-                controller = null;
+                } else
+                    resultText.innerText += "\n\n";
             }
-        }
 
-        function displayError(message) {
-            const errorBanner = document.getElementById('errorBanner');
-            errorBanner.textContent = message;
-            errorBanner.style.display = 'block';
-            setTimeout(() => {
-                errorBanner.style.display = 'none';
-            }, 5000); // Hide after 5 seconds
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+
+            let startTime = performance.now();
+            let totalTokens = 0;
+            let message_content = '';
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+
+                const chunk = decoder.decode(value);
+                const api_resp = JSON.parse(chunk);
+                message_content += api_resp.message.content;
+                const lines = chunk.split('\n');
+
+                for (const line of lines) {
+                    if (!line.trim()) continue;
+
+                    try {
+                        const parsed = JSON.parse(line);
+                        const token = parsed.message?.content || '';
+
+                        if (token) {
+                            resultText.innerText += token;
+                            totalTokens++;
+                            scrollToBottom();
+                            // Add assistant response to context
+                            // if (chunk.includes('assistant')) {
+                            //     addMessageToContext("assistant", token);
+                            // }
+                        }
+                    } catch (e) {
+                        console.error("JSON Parse Error:", e.message, "Line:", line);
+                        resultText.innerText += " [JSON Parse Error]";
+                    }
+                }
+                //console.log();
+            }
+            addMessageToContext("assistant", message_content);
+            //console.log(message_content);
+            const endTime = performance.now();
+            const elapsedTime = (endTime - startTime) / 1000; // in seconds
+            const tokenRate = (totalTokens / elapsedTime).toFixed(2); // Tokens per second
+
+            //tokensStatus.textContent = `\n\nTotal Tokens: ${totalTokens}`;
+            tokensStatus.textContent += `Token Rate: ${tokenRate} t/sec`;
+            userPromptInput.value = "";
+
+        } catch (error) {
+            //console.error("Error fetching completion:", error);
+            if (signal.aborted) {
+                resultText.innerText += " ...Request aborted.";
+            } else {
+                if (error instanceof TypeError && error.message === "Failed to fetch") {
+                    console.error("Network error. Check your connection.");
+                    resultText.innerText += " Network error. Please check your connection and try again.";
+                } else if (error instanceof TypeError && error.message.includes("CORS")) {
+                    console.error("CORS Error. Check your server configuration.");
+                    resultText.innerText += " CORS error. Please check your server configuration.";
+                } else {
+                    resultText.innerText += `Error: ${error.message || "An unknown error occurred."}`;
+                }
+            }
+        } finally {
+            // Enable the generate button and disable the stop button
+            generateBtn.disabled = false;
+            stopBtn.disabled = true;
+            controller = null;
         }
-    </script>
-    <script>
-        // if (hljs) { hljs.highlightAll(); }
-    </script>
+    }
+
+    function displayError(message) {
+        const errorBanner = document.getElementById('errorBanner');
+        errorBanner.textContent = message;
+        errorBanner.style.display = 'block';
+        setTimeout(() => {
+            errorBanner.style.display = 'none';
+        }, 5000); // Hide after 5 seconds
+    }
+</script>
+<script>
+    // if (hljs) { hljs.highlightAll(); }
+</script>
 </body>
 
 </html>
