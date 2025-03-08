@@ -26,7 +26,6 @@
 
     <script src="http://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 
-    <script src="models.js"></script>
     <title>Local LLM</title>
 
 </head>
@@ -36,7 +35,9 @@
         <h1 class="display-4 font-weight-bold mb-5">
             Local LLM Chat
         </h1>
-
+        <div id="errorBanner" class="alert alert-danger text-center" style="display: none;">
+        </div>
+    
         <!-- Model Dropdown in the Top Right Corner -->
         <div class="dropdown position-absolute top-0 end-0 mt-4 me-4">
             <button class="btn btn-outline-primary dropdown-toggle" type="button" id="modelDropdown"
@@ -76,8 +77,8 @@
 
     <script>
 
-        const MODELS_JSON_URL = "models.js";
-        const API_URL = "http://localhost:5000/api/message";//"https://api.openai.com/v1/chat/completions"; //use this if you choose to use an OpenAI model
+        const MODELS_JSON_URL = "http://localhost:11434/api/tags";
+        const API_URL = "http://127.0.0.1:11434/api/chat";//"https://api.openai.com/v1/chat/completions"; //use this if you choose to use an OpenAI model
         const userPromptInput = document.getElementById("userPromptInput");
         const generateBtn = document.getElementById("generateBtn");
         const stopBtn = document.getElementById("stopBtn");
@@ -86,7 +87,7 @@
         const modelDropdownBtn = document.getElementById("modelDropdown"); // Dropdown button element
         const sysPrompt = document.getElementById("sysPromptInput");
 
-        let selectedModel = 7; // See server.js
+        let selectedModel = ""; // one of the fastest "granite3.1-moe:3b-instruct-q8_0"
 
         let models = {};
 
@@ -97,6 +98,8 @@
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
                 models = await response.json();
+                if (!models.models.length)
+                    displayError("No Ollama models may be installed. Please install Ollama and pull atleast one LLM model.");
             } catch (error) {
                 console.error("Error fetching models:", error);
                 models = {};
@@ -107,29 +110,25 @@
         function onContentLoaded() {
             sysPrompt.value = "You will only answer questions that pertain to Python programming language. And politely decline to say anything other than that.";
 
-            if (!mdls) {
-                alert("No models installed. Use: ollama pull <model name>");
-                return;
-            }
+            // if (!mdls) {
+            //     alert("No models installed. Use: ollama pull <model name>");
+            //     return;
+            // }
 
-            const firstModelKey = mdls.models[0];
-            selectedModel = "granite3.1-moe:3b-instruct-q8_0";//firstModelKey?.name;
-            modelDropdownBtn.textContent = selectedModel;
-            populateDropdown2();
+            // const firstModelKey = mdls.models[0];
             //updateModel(selectedModel);
-            // fetchModels().then(() => {
-            //     const firstModelKey = Object.keys(models)[0];
-            //     selectedModel = firstModelKey;
-            //     updateModel(firstModelKey);
-            //     populateDropdown();
-            // });
+            fetchModels().then(() => {
+                //selectedModel = "granite3.1-moe:3b-instruct-q8_0";//firstModelKey?.name;
+                modelDropdownBtn.textContent = selectedModel;
+                populateDropdown2();
+            });
         }
 
         function populateDropdown2() {
             const dropdownMenu = document.querySelector(".dropdown-menu");
             dropdownMenu.innerHTML = "";
 
-            mdls.models.forEach(model => {
+            models.models.forEach(model => {
                 const listItem = document.createElement("li");
                 listItem.role = "presentation";
 
@@ -150,7 +149,7 @@
                     selectedModel = e.target.textContent;
                     modelDropdownBtn.textContent = selectedModel;
 
-                  //  updateModel(selectedModel);
+                    //  updateModel(selectedModel);
                 });
             });
 
@@ -168,7 +167,10 @@
                 alert("Please enter a prompt.");
                 return;
             }
-
+            if (!models.models.length){
+                    displayError("No Ollama models may be installed. Please install Ollama and pull atleast one LLM model.");
+                    return;
+                }
             // Disable the generate button and enable the stop button
             generateBtn.disabled = true;
             stopBtn.disabled = false;
@@ -221,7 +223,7 @@
         document.addEventListener("DOMContentLoaded", onContentLoaded);
 
         async function streamCompletionFromLocalLLM(messages, model, resultText) {
-            const apiUrl = "http://127.0.0.1:11434/api/chat";
+            const apiUrl = API_URL;
 
             if (!resultText) {
                 console.error("result element not found");
@@ -324,6 +326,15 @@
                 stopBtn.disabled = true;
                 controller = null;
             }
+        }
+
+        function displayError(message) {
+            const errorBanner = document.getElementById('errorBanner');
+            errorBanner.textContent = message;
+            errorBanner.style.display = 'block';
+            setTimeout(() => {
+                errorBanner.style.display = 'none';
+            }, 5000); // Hide after 5 seconds
         }
     </script>
     <script>
