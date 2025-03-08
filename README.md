@@ -1,4 +1,4 @@
-# Local Personal GPT
+# Local LLM Chat
 
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -29,32 +29,21 @@ Follow these steps to set up and run Local Personal GPT:
     * Download the desired local LLMs using Ollama.
         * Example: `ollama pull llama3.2`
 
-2.  **Configure LLM Selection:**
-    * **Note:** Currently, the LLM selection is hardcoded in `server/index.js` and `index.html`. Future versions will implement an API call to dynamically load available models.
-    * Modify `server/index.js` and `index.html` to reflect the names of the local models you have installed.
-
-3.  **Run the Server:**
-    * Open a command prompt or terminal.
-    * Navigate to the `server` directory:
+2.  **Install http-server:**
+    * Open your terminal and run the following command to install `http-server` globally:
         ```bash
-        cd server
+        npm install -g http-server
         ```
-    * Install dependencies:
+3.  **Start the http-server:**
+    * Open your terminal and run the following command to start `http-server`:
         ```bash
-        npm install
+        http-server
         ```
-    * Start the server:
-        ```bash
-        npm start
-        ```
-
-4.  **Launch the Application:**
-    * Open `index.html` in your web browser by double-clicking the file.
-    * No web server is required as the application runs directly in the browser, communicating with the local server.
+4.  **Start using your personal LLM Chat:**
+    * In your favorite browser, open `http://localhost`
 
 ## Future Enhancements
 
-* **Dynamic LLM Selection:** Implement an API call to dynamically load and display available LLMs from Ollama.
 * **Improved User Interface:** Enhance the user interface for a more intuitive and user-friendly experience.
 * **Advanced Configuration:** Provide options for advanced configuration and customization.
 * **Persistent Storage:** Implement local storage to persist conversation history.

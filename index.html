@@ -24,6 +24,9 @@
         integrity="sha512-Jk4AqjWsdSzSWCSuQTfYRIF84Rq/eV0G2+tu07byYwHcbTGfdmLrHjUSwvzp5HvbiqK4ibmNwdcG49Y5RGYPTg=="
         crossorigin="anonymous" referrerpolicy="no-referrer" />
 
+    <script src="http://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+
+    <script src="models.js"></script>
     <title>Local LLM</title>
 
 </head>
@@ -41,18 +44,21 @@
                 Select Model
             </button>
             <ul class="dropdown-menu" aria-labelledby="modelDropdown" role="menu">
-                <li role="presentation"><a role="menuitem" class="dropdown-item" href="#" data-model="1">These will be replaced with the list below</a></li>
-                <li role="presentation"><a role="menuitem" class="dropdown-item" href="#" data-model="2">These will be replaced with the list below</a></li>
+                <li role="presentation"><a role="menuitem" class="dropdown-item" href="#" data-model="1">These will be
+                        replaced with the list below</a></li>
+                <li role="presentation"><a role="menuitem" class="dropdown-item" href="#" data-model="2">These will be
+                        replaced with the list below</a></li>
             </ul>
         </div>
         <label>System Prompt</label>
-        <input type="text" id="sysPromptInput" class="form-control form-control-lg mt-4"/>
+        <input type="text" id="sysPromptInput" class="form-control form-control-lg mt-4" />
 
         <div id="resultContainer" class="mt-3 h-48 overflow-auto">
             <p class="text-muted small mb-2"></p>
             <div id="resultText"></div>
         </div>
-        <input type="text" id="userPromptInput" class="form-control form-control-lg mt-4" placeholder="How can I help you..." />
+        <input type="text" id="userPromptInput" class="form-control form-control-lg mt-4"
+            placeholder="How can I help you..." />
         <div class="d-flex justify-content-center mt-4">
             <button id="generateBtn"
                 class="btn btn-dark btn-lg w-50 mr-2 disabled-opacity-75 disabled:cursor-not-allowed">
@@ -70,8 +76,8 @@
 
     <script>
 
+        const MODELS_JSON_URL = "models.js";
         const API_URL = "http://localhost:5000/api/message";//"https://api.openai.com/v1/chat/completions"; //use this if you choose to use an OpenAI model
-
         const userPromptInput = document.getElementById("userPromptInput");
         const generateBtn = document.getElementById("generateBtn");
         const stopBtn = document.getElementById("stopBtn");
@@ -82,32 +88,48 @@
 
         let selectedModel = 7; // See server.js
 
-        // Mapping model numbers to model names for easy lookup
-        const modelNames = {
-            1: "phi4:14b-q4_K_M",
-            2: "qwen2.5-coder:7b",
-            3: "granite3.1-moe:3b-instruct-q8_0",
-            4: "deepseek-r1:1.5b",
-            5: "llama3.2:latest",
-            6: "deepseek-r1:latest",
-            7: "llama3.2:3b",
-            8: "deepseek-coder-v2:latest"
-            //add others but the server.js must recognize these and switch to corresponding OLLAMA model name
-        };
+        let models = {};
+
+        async function fetchModels() {
+            try {
+                const response = await fetch(MODELS_JSON_URL);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                models = await response.json();
+            } catch (error) {
+                console.error("Error fetching models:", error);
+                models = {};
+            }
+        }
+
 
         function onContentLoaded() {
-
             sysPrompt.value = "You will only answer questions that pertain to Python programming language. And politely decline to say anything other than that.";
 
-            updateModel(selectedModel); // Set the dropdown button text when the page loads
+            if (!mdls) {
+                alert("No models installed. Use: ollama pull <model name>");
+                return;
+            }
 
+            const firstModelKey = mdls.models[0];
+            selectedModel = "granite3.1-moe:3b-instruct-q8_0";//firstModelKey?.name;
+            modelDropdownBtn.textContent = selectedModel;
+            populateDropdown2();
+            //updateModel(selectedModel);
+            // fetchModels().then(() => {
+            //     const firstModelKey = Object.keys(models)[0];
+            //     selectedModel = firstModelKey;
+            //     updateModel(firstModelKey);
+            //     populateDropdown();
+            // });
+        }
+
+        function populateDropdown2() {
             const dropdownMenu = document.querySelector(".dropdown-menu");
-
-            // Clear existing dropdown items (if any)
             dropdownMenu.innerHTML = "";
 
-            // Populate dropdown with models
-            Object.keys(modelNames).forEach(key => {
+            mdls.models.forEach(model => {
                 const listItem = document.createElement("li");
                 listItem.role = "presentation";
 
@@ -115,28 +137,24 @@
                 anchor.href = "#";
                 anchor.className = "dropdown-item";
                 anchor.setAttribute("role", "menuitem");
-                anchor.setAttribute("data-model", key);
-                anchor.textContent = modelNames[key];
+                //anchor.setAttribute("data-model", key);
+                anchor.textContent = model.name;
 
                 listItem.appendChild(anchor);
                 dropdownMenu.appendChild(listItem);
             });
 
-            // Add event listeners for selection
             document.querySelectorAll(".dropdown-item").forEach(item => {
                 item.addEventListener("click", (e) => {
                     e.preventDefault();
-                    selectedModel = e.target.getAttribute("data-model");
-                    document.getElementById("modelDropdown").textContent = modelNames[selectedModel];
+                    selectedModel = e.target.textContent;
+                    modelDropdownBtn.textContent = selectedModel;
+
+                  //  updateModel(selectedModel);
                 });
             });
-        }
 
-        // Function to update selected model (sending numbers)
-        const updateModel = (modelNumber) => {
-            selectedModel = modelNumber;
-            modelDropdownBtn.textContent = modelNames[selectedModel]; // Update the dropdown button text
-        };
+        }
 
         let controller = null; // Store the AbortController instance
 
@@ -159,56 +177,21 @@
             // Create a new AbortController instance
             controller = new AbortController();
             const signal = controller.signal;
-
             try {
-                // Fetch the response from the OpenAI API with the signal from AbortController
-                const imessages = [
+
+                const messages = [
                     { role: 'system', content: sysPrompt.value },
                     { role: "user", content: userPromptInput.value },
                 ];
-                const response = await fetch(API_URL, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({
-                        model: selectedModel,
-                        messages: imessages,
-                        max_tokens: 100,
-                        stream: true, // For streaming responses
-                    }),
-                    signal, // Pass the signal to the fetch request
-                });
 
-                // Read the response as a stream of data
-                const reader = response.body.getReader();
-                const decoder = new TextDecoder("utf-8");
-                resultText.innerText = "";
-                let fullmessage = null;
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) {
-                        break;
-                    }
-                    // Massage and parse the chunk of data
-                    const chunk = decoder.decode(value);
-                    resultText.innerText += chunk;
-                    fullmessage += chunk;
-                    scrollToBottom();
-                }
+                await streamCompletionFromLocalLLM(messages, selectedModel, resultText);
             } catch (error) {
-                // Handle fetch request errors
-                if (signal.aborted) {
-                    resultText.innerText += "...Request aborted.";
-                } else {
-                    console.error("Error:", error);
-                    resultText.innerText = "Error occurred while generating. See server logs.";
-                }
+                resultText.innerText = "Error occurred while generating. " + error;
             } finally {
                 // Enable the generate button and disable the stop button
                 generateBtn.disabled = false;
                 stopBtn.disabled = true;
-                controller = null; // Reset the AbortController instance
+                controller = null; // Reset the AbortController instance                
             }
         };
 
@@ -237,6 +220,111 @@
 
         document.addEventListener("DOMContentLoaded", onContentLoaded);
 
+        async function streamCompletionFromLocalLLM(messages, model, resultText) {
+            const apiUrl = "http://127.0.0.1:11434/api/chat";
+
+            if (!resultText) {
+                console.error("result element not found");
+                return;
+            }
+
+            resultText.innerText = "";
+
+            const requestBody = {
+                messages: messages,
+                model: model
+            };
+
+            generateBtn.disabled = true;
+            stopBtn.disabled = false;
+            resultText.innerText = "Generating...";
+
+            // Create a new AbortController instance
+            controller = new AbortController();
+            const signal = controller.signal;
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(requestBody),
+                    signal,
+                });
+
+                if (!response.ok) {
+                    try {
+                        const errorData = await response.json();
+                        resultText.innerText = `Server Error: ${errorData.error || JSON.stringify(errorData)}`;
+                        return;
+                    } catch (jsonError) {
+                        resultText.innerText = `HTTP error! status: ${response.status}. Could not parse server error.`;
+                        return;
+                    }
+                } else {
+                    resultText.innerText = "";
+                }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+
+                let startTime = performance.now();
+                let totalTokens = 0;
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const chunk = decoder.decode(value);
+                    const lines = chunk.split('\n');
+
+                    for (const line of lines) {
+                        if (!line.trim()) continue;
+
+                        try {
+                            const parsed = JSON.parse(line);
+                            const token = parsed.message?.content || '';
+
+                            if (token) {
+                                resultText.innerText += token;
+                                totalTokens++;
+                                scrollToBottom();
+                            }
+                        } catch (e) {
+                            console.error("JSON Parse Error:", e.message, "Line:", line);
+                            resultText.innerText += "[JSON Parse Error]";
+                        }
+                    }
+                }
+
+                const endTime = performance.now();
+                const elapsedTime = (endTime - startTime) / 1000; // in seconds
+                const tokenRate = (totalTokens / elapsedTime).toFixed(2); // Tokens per second
+
+                resultText.innerText += `\n\nTotal Tokens: ${totalTokens}`;
+                resultText.innerText += `\nToken Rate: ${tokenRate} t/sec`;
+
+            } catch (error) {
+                //console.error("Error fetching completion:", error);
+                if (signal.aborted) {
+                    resultText.innerText += "...Request aborted.";
+                } else {
+                    if (error instanceof TypeError && error.message === "Failed to fetch") {
+                        console.error("Network error. Check your connection.");
+                        resultText.innerText = "Network error. Please check your connection and try again.";
+                    } else if (error instanceof TypeError && error.message.includes("CORS")) {
+                        console.error("CORS Error. Check your server configuration.");
+                        resultText.innerText = "CORS error. Please check your server configuration.";
+                    } else {
+                        resultText.innerText = `Error: ${error.message || "An unknown error occurred."}`;
+                    }
+                }
+            } finally {
+                // Enable the generate button and disable the stop button
+                generateBtn.disabled = false;
+                stopBtn.disabled = true;
+                controller = null;
+            }
+        }
     </script>
     <script>
         // if (hljs) { hljs.highlightAll(); }
