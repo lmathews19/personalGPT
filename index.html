@@ -25,6 +25,8 @@
         crossorigin="anonymous" referrerpolicy="no-referrer" />
 
     <script src="http://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <!-- Font Awesome CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
     <style>
         .fs-xs {
@@ -51,14 +53,13 @@
             <ul class="dropdown-menu" aria-labelledby="modelDropdown" role="menu">
                 <li role="presentation"><a role="menuitem" class="dropdown-item" href="#" data-model="1">These will be
                         replaced with the list below</a></li>
-                <li role="presentation"><a role="menuitem" class="dropdown-item" href="#" data-model="2">These will be
-                        replaced with the list below</a></li>
             </ul>
         </div>
 
         <label>System Prompt</label>
-        <input type="text" id="sysPromptInput" class="form-control form-control-lg mt-4" />
+        <i id="editIcon" class="fas fa-edit" style="cursor: pointer;"></i>
 
+        <textarea id="sysPromptInput" class="form-control form-control-lg mt-4" style="display: none;height: 400px;"></textarea>
         <div id="resultContainer" class="mt-3 h-48">
             <p class="text-muted small mb-2"></p>
             <div id="resultText" class="mt-3 overflow-auto" style="max-height: 400px;"></div>
@@ -96,6 +97,33 @@
     const sysPrompt = document.getElementById("sysPromptInput");
     const tokensStatus = document.getElementById("tokensStatus");
 
+    // default system prompt
+    sysPrompt.value = `You are an advanced AI assistant, skilled in providing accurate, insightful, and context-aware responses. Your knowledge is vast, 
+up-to-date, and specialized in multiple domains, including but not limited to technology, business, science, philosophy, and creative writing. 
+You can generate well-structured text, analyze complex ideas, and adapt your tone and style based on the user's needs.
+
+Your Response Style:
+Be clear, concise, and informative—explain concepts with precision.
+Adapt to the user's tone, style, and expertise level (technical for experts, simplified for beginners).
+When necessary, ask clarifying questions to refine your responses.
+Be engaging and conversational without being overly verbose.
+
+Your Fact-Checking ability and Accuracy:
+Always prioritize accurate, factual, and well-reasoned responses.
+If a topic is uncertain or time-sensitive, use external search capabilities.
+Avoid speculation; when necessary, state that information is inconclusive rather than guessing.
+
+Your Problem-Solving and Creativity:
+Offer step-by-step solutions where applicable.
+Provide multiple perspectives when answering opinion-based or strategic questions.
+Think critically and suggest practical, actionable advice.
+For creative tasks (writing, brainstorming, design), generate original and high-quality content.
+
+Your Limitations and Transparency:
+If a question is outside your knowledge scope, be honest and suggest resources.
+Do not fabricate information; always base responses on known data.
+If a topic is subjective, acknowledge different viewpoints.`;
+
     let selectedModel = ""; // one of the fastest "granite3.1-moe:3b-instruct-q8_0"
 
     let models = {};
@@ -106,6 +134,15 @@
     // Initialize the context on page load
     resetContext();
     generateButtonReset();
+
+    document.getElementById('editIcon').addEventListener('click', function () {
+        document.getElementById('sysPromptInput').style.display = 'block';
+        document.getElementById('sysPromptInput').focus();
+    });
+
+    document.getElementById('sysPromptInput').addEventListener('blur', function () {
+        document.getElementById('sysPromptInput').style.display = 'none';
+    });
 
     async function fetchModels() {
         try {
@@ -142,7 +179,7 @@
     });
 
     function onContentLoaded() {
-        sysPrompt.value = "you are a story writer";//"You will only answer questions that pertain to Python programming language. And politely decline to say anything other than that.";
+        //sysPrompt.value = "You are helpful assistant";//"You will only answer questions that pertain to Python programming language. And politely decline to say anything other than that.";
 
         fetchModels().then(() => {
             selectedModel = "granite3.1-moe:3b-instruct-q8_0";//firstModelKey?.name;
@@ -194,9 +231,8 @@
 
     // Function to add message to context
     function addMessageToContext(role, content) {
-        if(!(conversationContext[conversationContext.length -1].role == role && 
-        conversationContext[conversationContext.length -1].content == content))
-        {
+        if (!(conversationContext[conversationContext.length - 1].role == role &&
+            conversationContext[conversationContext.length - 1].content == content)) {
             conversationContext.push({ role, content });
         }
     }
@@ -207,7 +243,7 @@
         userPromptInput.value = ""; // Clear the prompt input field
         // Optionally start new conversation with an overarching system prompt
         conversationContext = [
-            { role: "system", content: sysPrompt.value || "You are a helpful assistant." }
+            { role: "system", content: sysPrompt.value }
         ];
     }
 
@@ -366,7 +402,7 @@
 
         } catch (error) {
             //console.error("Error fetching completion:", error);
-            if (!signal.aborted){
+            if (!signal.aborted) {
                 if (error instanceof TypeError && error.message === "Failed to fetch") {
                     console.error("Network error. Check your connection.");
                     resultText.innerText += " Network error. Please check your connection and try again.";
