@@ -77,10 +77,6 @@
                 class="btn btn-dark btn-lg w-50 mr-2 disabled-opacity-75 disabled:cursor-not-allowed">
                 Generate
             </button>
-            <button id="stopBtn" disabled
-                class="btn btn-outline-secondary btn-lg w-50 ml-2 disabled-opacity-75 disabled:cursor-not-allowed">
-                Stop
-            </button>
             <button id="clearBtn" class="btn btn-outline-danger btn-lg w-50 ml-2">
                 Clear
             </button>
@@ -94,7 +90,6 @@
     const API_URL = "http://127.0.0.1:11434/api/chat";//"https://api.openai.com/v1/chat/completions"; //use this if you choose to use an OpenAI model
     const userPromptInput = document.getElementById("userPromptInput");
     const generateBtn = document.getElementById("generateBtn");
-    const stopBtn = document.getElementById("stopBtn");
     const resultText = document.getElementById("resultText");
     const clearBtn = document.getElementById("clearBtn");
     const modelDropdownBtn = document.getElementById("modelDropdown"); // Dropdown button element
@@ -104,6 +99,13 @@
     let selectedModel = ""; // one of the fastest "granite3.1-moe:3b-instruct-q8_0"
 
     let models = {};
+
+    let isGenerating = false;
+    // Define a context array to hold all conversation turns
+    let conversationContext = [];
+    // Initialize the context on page load
+    resetContext();
+    generateButtonReset();
 
     async function fetchModels() {
         try {
@@ -120,6 +122,24 @@
         }
     }
 
+    function toggleGenerateStop() {
+        if (isGenerating) {
+            stop(); // Call the stop function
+            generateBtn.textContent = "Generate"; // Change button label back to "Generate"
+        } else {
+            generateBtn.textContent = "Stop"; // Change button label to "Stop"
+            generate(); // Call the generate function
+        }
+        isGenerating = !isGenerating;
+    }
+
+    userPromptInput.addEventListener("input", () => {
+        if (userPromptInput.value.trim().length > 0) {
+            generateBtn.disabled = false;
+        } else {
+            generateBtn.disabled = true;
+        }
+    });
 
     function onContentLoaded() {
         sysPrompt.value = "you are a story writer";//"You will only answer questions that pertain to Python programming language. And politely decline to say anything other than that.";
@@ -172,40 +192,37 @@
         }
     };
 
-    // Define a context array to hold all conversation turns
-    let conversationContext = [];
-
     // Function to add message to context
     function addMessageToContext(role, content) {
-        conversationContext.push({ role, content });
+        if(!(conversationContext[conversationContext.length -1].role == role && 
+        conversationContext[conversationContext.length -1].content == content))
+        {
+            conversationContext.push({ role, content });
+        }
     }
 
     // Function to reset the context (used when clearing the conversation)
     function resetContext() {
+        resultText.innerText = ""; // Clear the result text
+        userPromptInput.value = ""; // Clear the prompt input field
         // Optionally start new conversation with an overarching system prompt
         conversationContext = [
             { role: "system", content: sysPrompt.value || "You are a helpful assistant." }
         ];
     }
 
-    // Initialize the context on page load
-    resetContext();
-
     async function generate() {
         // Alert the user if no prompt value
         if (!userPromptInput.value) {
-            alert("Please enter a prompt.");
+            displayError("Please enter a prompt.");
+            generateButtonReset();
             return;
         }
         if (!models.models.length) {
             displayError("No Ollama models may be installed. Please install Ollama and pull at least one LLM model.");
+            generateButtonReset();
             return;
         }
-        // Disable the generate button and enable the stop button
-        generateBtn.disabled = true;
-        stopBtn.disabled = false;
-        if (resultText.innerText.length == 0)
-            resultText.innerText = " Generating...";
 
         // Add user message to context
         addMessageToContext("user", userPromptInput.value);
@@ -216,24 +233,31 @@
             resultText.innerText += " Error occurred while generating. " + error;
         } finally {
             // Enable the generate button and disable the stop button
-            generateBtn.disabled = false;
-            stopBtn.disabled = true;
+            generateButtonReset();
+            //generateBtn.disabled = false;
             controller = null; // Reset the AbortController instance
         }
     }
 
-    const clear = () => {
-        resultText.innerText = ""; // Clear the result text
-        userPromptInput.value = ""; // Clear the prompt input field
+    function generateButtonReset() {
+        generateBtn.textContent = "Generate"; // Change button label back to "Generate"
+        isGenerating = false;
+        if (userPromptInput.value == "")
+            generateBtn.disabled = true;
+    }
+
+    function clear() {
+        stop();
         resetContext(); // Reset the conversation context
     };
 
-    const stop = () => {
+    function stop() {
         // Abort the fetch request by calling abort() on the AbortController instance
         if (controller) {
             controller.abort();
             controller = null;
         }
+        generateButtonReset();
     };
 
     userPromptInput.addEventListener("keyup", (event) => {
@@ -242,8 +266,7 @@
         }
     });
 
-    generateBtn.addEventListener("click", generate);
-    stopBtn.addEventListener("click", stop);
+    generateBtn.addEventListener("click", toggleGenerateStop);
     clearBtn.addEventListener("click", clear);
 
     document.addEventListener("DOMContentLoaded", onContentLoaded);
@@ -265,11 +288,6 @@
             //     "num_ctx": 32768
             // }
         };
-
-        generateBtn.disabled = true;
-        stopBtn.disabled = false;
-        if (resultText.innerText.length == 0)
-            resultText.innerText = " Generating...";
 
         // Create a new AbortController instance
         controller = new AbortController();
@@ -293,10 +311,7 @@
                     return;
                 }
             } else {
-                if (resultText.innerText == "Generating...") {
-                    resultText.innerText = "";
-                } else
-                    resultText.innerText += "\n\n";
+                resultText.innerText += "\n\n";
             }
 
             const reader = response.body.getReader();
@@ -338,6 +353,7 @@
                 }
                 //console.log();
             }
+
             addMessageToContext("assistant", message_content);
             //console.log(message_content);
             const endTime = performance.now();
@@ -345,14 +361,12 @@
             const tokenRate = (totalTokens / elapsedTime).toFixed(2); // Tokens per second
 
             //tokensStatus.textContent = `\n\nTotal Tokens: ${totalTokens}`;
-            tokensStatus.textContent += `Token Rate: ${tokenRate} t/sec`;
+            tokensStatus.textContent = `Token Rate: ${tokenRate} t/sec`;
             userPromptInput.value = "";
 
         } catch (error) {
             //console.error("Error fetching completion:", error);
-            if (signal.aborted) {
-                resultText.innerText += " ...Request aborted.";
-            } else {
+            if (!signal.aborted){
                 if (error instanceof TypeError && error.message === "Failed to fetch") {
                     console.error("Network error. Check your connection.");
                     resultText.innerText += " Network error. Please check your connection and try again.";
@@ -365,8 +379,6 @@
             }
         } finally {
             // Enable the generate button and disable the stop button
-            generateBtn.disabled = false;
-            stopBtn.disabled = true;
             controller = null;
         }
     }
