@@ -8,6 +8,8 @@ Local Personal GPT is an experimental project designed to provide a customizable
 
 **Key Features:**
 
+* **Does not have a Server Component:** Lightning-fast chat with your Ollama instance—experience ultra-low latency compared to other chat clients! 
+* **Edit Historical Context:** Rewrite history! Effortlessly edit past chat context for a more flexible conversation experience. 
 * **Offline Functionality:** Operates entirely locally, eliminating the need for internet connectivity.
 * **Customizable LLM Selection:** Users can select and utilize their preferred LLMs installed through Ollama.
 * **Privacy-Focused:** Keeps all data and interactions within the user's local environment.

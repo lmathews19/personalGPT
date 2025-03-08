@@ -6,9 +6,10 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <!-- Bootstrap 5 CSS (CDN) -->
-    <link href="http://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="http://getbootstrap.com/docs/5.3/assets/css/docs.css" rel="stylesheet">
     <title>Local LLM Chat</title>
+    <link href="http://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="http://getbootstrap.com/docs/5.3/assets/css/docs.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
     <script src="http://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
     <script src="http://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
@@ -25,12 +26,33 @@
         crossorigin="anonymous" referrerpolicy="no-referrer" />
 
     <script src="http://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-    <!-- Font Awesome CDN -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
     <style>
         .fs-xs {
             font-size: 0.75rem;
+        }
+
+        .userInputWrapper {
+            position: relative;
+
+        }
+
+        .userInput {
+            padding-right: 30px;
+            /* Adjust the padding based on the icon size */
+        }
+
+        #editContextBtn {
+            position: absolute;
+            top: 50%;
+            right: 5px;
+            /* Adjust the position of the icon */
+            transform: translateY(-50%);
+            cursor: pointer;
+        }
+
+        .btn-gap {
+            margin-right: 50px;
         }
     </style>
 
@@ -56,17 +78,24 @@
             </ul>
         </div>
 
-        <label>System Prompt</label>
+        <label id="editIconLabel">System Prompt</label>
         <i id="editIcon" class="fas fa-edit" style="cursor: pointer;"></i>
 
-        <textarea id="sysPromptInput" class="form-control form-control-lg mt-4" style="display: none;height: 400px;"></textarea>
+        <textarea id="sysPromptInput" class="form-control form-control-lg mt-4"
+            style="display: none;height: 400px;"></textarea>
         <div id="resultContainer" class="mt-3 h-48">
             <p class="text-muted small mb-2"></p>
             <div id="resultText" class="mt-3 overflow-auto" style="max-height: 400px;"></div>
         </div>
 
-        <input type="text" id="userPromptInput" class="form-control form-control-lg mt-4"
-            placeholder="How can I help you..." value="Write a story" />
+        <div class="userInputWrapper">
+            <input type="text" id="userPromptInput" class="form-control form-control-lg mt-4"
+                placeholder="Enter your text here.">
+            <i id="editContextBtn" class="fa fa-edit"></i>
+        </div>
+
+        <!-- <input type="text" id="userPromptInput" class="form-control form-control-lg mt-4"
+            placeholder="How can I help you..." value="Write a story" /> -->
 
         <!-- Token Rate Status Bar -->
         <div class="d-flex justify-content-end align-items-center mt-2">
@@ -75,7 +104,7 @@
 
         <div class="d-flex justify-content-center mt-4">
             <button id="generateBtn"
-                class="btn btn-dark btn-lg w-50 mr-2 disabled-opacity-75 disabled:cursor-not-allowed">
+                class="btn-gap btn btn-dark btn-lg w-50 mr-2 disabled-opacity-75 disabled:cursor-not-allowed">
                 Generate
             </button>
             <button id="clearBtn" class="btn btn-outline-danger btn-lg w-50 ml-2">
@@ -98,31 +127,30 @@
     const tokensStatus = document.getElementById("tokensStatus");
 
     // default system prompt
-    sysPrompt.value = `You are an advanced AI assistant, skilled in providing accurate, insightful, and context-aware responses. Your knowledge is vast, 
-up-to-date, and specialized in multiple domains, including but not limited to technology, business, science, philosophy, and creative writing. 
-You can generate well-structured text, analyze complex ideas, and adapt your tone and style based on the user's needs.
+    sysPrompt.value = `You are an advanced AI assistant, skilled in providing accurate, insightful, and context-aware responses. Your knowledge is vast, up-to-date, and specialized in multiple domains, including but not limited to technology, business, science, philosophy, and creative writing. You can generate well-structured text, analyze complex ideas, and adapt your tone and style based on the user's needs.
 
 Your Response Style:
-Be clear, concise, and informative—explain concepts with precision.
-Adapt to the user's tone, style, and expertise level (technical for experts, simplified for beginners).
-When necessary, ask clarifying questions to refine your responses.
-Be engaging and conversational without being overly verbose.
+* Be clear, concise, and informative—explain concepts with precision.
+* Adapt to the user's tone, style, and expertise level (technical for experts, simplified for beginners).
+* When necessary, ask clarifying questions to refine your responses.
+* Be engaging and conversational without being overly verbose.
 
 Your Fact-Checking ability and Accuracy:
-Always prioritize accurate, factual, and well-reasoned responses.
-If a topic is uncertain or time-sensitive, use external search capabilities.
-Avoid speculation; when necessary, state that information is inconclusive rather than guessing.
+* Always prioritize accurate, factual, and well-reasoned responses.
+* If a topic is uncertain or time-sensitive, use external search capabilities.
+* Avoid speculation; when necessary, state that information is inconclusive rather than guessing.
+* Don't give me random or arbitrary responses. For example, if i ask - "help me with math", start by asking me to describe the problem before attempting to generate an answer.
 
 Your Problem-Solving and Creativity:
-Offer step-by-step solutions where applicable.
-Provide multiple perspectives when answering opinion-based or strategic questions.
-Think critically and suggest practical, actionable advice.
-For creative tasks (writing, brainstorming, design), generate original and high-quality content.
+* Offer step-by-step solutions where applicable.
+* Provide multiple perspectives when answering opinion-based or strategic questions.
+* Think critically and suggest practical, actionable advice.
+* For creative tasks (writing, brainstorming, design), generate original and high-quality content.
 
 Your Limitations and Transparency:
-If a question is outside your knowledge scope, be honest and suggest resources.
-Do not fabricate information; always base responses on known data.
-If a topic is subjective, acknowledge different viewpoints.`;
+* If a question is outside your knowledge scope, be honest and suggest resources.
+* Do not fabricate information; always base responses on known data.
+* If a topic is subjective, acknowledge different viewpoints.`;
 
     let selectedModel = ""; // one of the fastest "granite3.1-moe:3b-instruct-q8_0"
 
@@ -134,6 +162,11 @@ If a topic is subjective, acknowledge different viewpoints.`;
     // Initialize the context on page load
     resetContext();
     generateButtonReset();
+
+    document.getElementById('editIconLabel').addEventListener('click', function () {
+        document.getElementById('sysPromptInput').style.display = 'block';
+        document.getElementById('sysPromptInput').focus();
+    });
 
     document.getElementById('editIcon').addEventListener('click', function () {
         document.getElementById('sysPromptInput').style.display = 'block';
@@ -151,6 +184,13 @@ If a topic is subjective, acknowledge different viewpoints.`;
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
             models = await response.json();
+            const sortedModels = models.models.sort((a, b) => {
+                if (a.name < b.name) return -1;
+                if (a.name > b.name) return 1;
+                return 0;
+            });
+            models.models = sortedModels;
+
             if (!models.models.length)
                 displayError("No Ollama models may be installed. Please install Ollama and pull atleast one LLM model.");
         } catch (error) {
@@ -347,7 +387,8 @@ If a topic is subjective, acknowledge different viewpoints.`;
                     return;
                 }
             } else {
-                resultText.innerText += "\n\n";
+                if (resultText.innerText)
+                    resultText.innerText += "\n\n";
             }
 
             const reader = response.body.getReader();
@@ -429,7 +470,88 @@ If a topic is subjective, acknowledge different viewpoints.`;
     }
 </script>
 <script>
-    // if (hljs) { hljs.highlightAll(); }
+    // Function to open and handle the conversation context editing popup
+    function editConversationContext() {
+        // Open a new popup window
+        const popupWindow = window.open("", "_blank", "width=600,height=400");
+
+        // Add styles and layout for the popup window
+        popupWindow.document.write(`
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="UTF-8">
+                <meta http-equiv="X-UA-Compatible" content="IE=edge">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" 
+                integrity="sha512-9usAa10IRO0HhonpyAIVpjrylPvoDwiPUiKdWk5t3PyolY1cOd4DSE0Ga+ri4AuTroPR5aQvXU9xC6qOPnzFeg==" 
+                crossorigin="anonymous" referrerpolicy="no-referrer" />
+	            <title>Edit Conversation</title>
+                            <style>
+                    .message {
+                        padding: 5px;
+                        margin: 5px;
+                    }
+                    .assistant {
+                        background-color: #f2f2f2;
+                    }
+                    .user {
+                        background-color: #e5f3a9;
+                    }
+                </style>
+            </head>
+            <body>
+                <h2>Edit Conversation</h2>
+                <p>Click a message to change it.</p>
+                <div id="conversationContainer"></div>
+            </body>
+            </html>
+        `);
+
+        setTimeout(() => {
+            const conversationContainer = popupWindow.document.getElementById("conversationContainer");
+
+            conversationContainer?.addEventListener('click', (event) => {
+                if (event.target.id.startsWith('deleteRowIcon-')) {
+                    const indexToRemove = parseInt(event.target.id.split('-')[1]);
+                    conversationContext.splice(indexToRemove, 1);
+                    renderConversation(); // Update the displayed conversation after deletion
+                }
+            });
+
+            function renderConversation() {
+                conversationContainer.innerHTML = ''; // Clear the container
+                conversationContext?.forEach((turn, index) => {
+                    const roleClass = turn.role === 'assistant' ? 'assistant' : 'user';
+                    conversationContainer.innerHTML += `
+            <div class="message ${roleClass}">
+                <i id="deleteRowIcon-${index}" class="fas fa-trash fa-delete" style="cursor: pointer;"></i>
+                <strong>${turn.role}: </strong>
+                <span contenteditable="true" data-index="${index}">${turn.content}</span>
+            </div>
+        `;
+                });
+            }
+
+            renderConversation();
+
+            // Allow user to edit the content property in the conversation context
+            conversationContainer?.addEventListener('input', (event) => {
+                if (event.target.tagName === 'SPAN' && event.target.hasAttribute('contenteditable')) {
+                    const index = parseInt(event.target.getAttribute('data-index'));
+                    const newValue = event.target.innerText;
+                    conversationContext[index].content = newValue;
+                }
+            });
+
+        }, 200); // A small delay to allow the document to be written
+
+
+    }
+
+    // Add event listener to the edit button
+    const editContextBtn = document.getElementById('editContextBtn');
+    editContextBtn.addEventListener('click', editConversationContext);
 </script>
 </body>
 
