@@ -306,7 +306,7 @@ Your Limitations and Transparency:
         try {
             await streamCompletionFromLocalLLM(conversationContext, selectedModel, resultText);
         } catch (error) {
-            resultText.innerText += " Error occurred while generating. " + error;
+            displayError("Error occurred while generating. " + error);
         } finally {
             // Enable the generate button and disable the stop button
             generateButtonReset();
@@ -355,7 +355,7 @@ Your Limitations and Transparency:
             return;
         }
 
-        //resultText.innerText = "";
+        //displayError("");
 
         const requestBody = {
             messages: messages,
@@ -380,15 +380,15 @@ Your Limitations and Transparency:
             if (!response.ok) {
                 try {
                     const errorData = await response.json();
-                    resultText.innerText += `Server Error: ${errorData.error || JSON.stringify(errorData)}`;
+                    displayError(`Server Error: ${errorData.error || JSON.stringify(errorData)}`);
                     return;
                 } catch (jsonError) {
-                    resultText.innerText += `HTTP error! status: ${response.status}. Could not parse server error.`;
+                    displayError(`HTTP error! status: ${response.status}. Could not parse server error.`);
                     return;
                 }
             } else {
                 if (resultText.innerText)
-                    resultText.innerText += "\n\n";
+                    resultText.innerHTML += '<br/><br/>';
             }
 
             const reader = response.body.getReader();
@@ -396,11 +396,12 @@ Your Limitations and Transparency:
 
             let startTime = performance.now();
             let totalTokens = 0;
+            if (resultText.innerText.length > 0)
+                resultText.innerHTML += '<br/><br/>';
             let message_content = '';
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
-
 
                 const chunk = decoder.decode(value);
                 const api_resp = JSON.parse(chunk);
@@ -414,24 +415,18 @@ Your Limitations and Transparency:
                         const parsed = JSON.parse(line);
                         const token = parsed.message?.content || '';
 
-                        if (token) {
-                            resultText.innerText += token;
-                            totalTokens++;
-                            scrollToBottom();
-                            // Add assistant response to context
-                            // if (chunk.includes('assistant')) {
-                            //     addMessageToContext("assistant", token);
-                            // }
-                        }
+                        resultText.innerHTML += token.replace(/\n/g, '<br>');
+                        totalTokens++;
+                        scrollToBottom();
                     } catch (e) {
                         console.error("JSON Parse Error:", e.message, "Line:", line);
-                        resultText.innerText += " [JSON Parse Error]";
+                        displayError("[JSON Parse Error]");
                     }
                 }
-                //console.log();
             }
 
             addMessageToContext("assistant", message_content);
+            //resultText.innerText = message_content;
             //console.log(message_content);
             const endTime = performance.now();
             const elapsedTime = (endTime - startTime) / 1000; // in seconds
@@ -446,12 +441,12 @@ Your Limitations and Transparency:
             if (!signal.aborted) {
                 if (error instanceof TypeError && error.message === "Failed to fetch") {
                     console.error("Network error. Check your connection.");
-                    resultText.innerText += " Network error. Please check your connection and try again.";
+                    displayError("Network error. Please check your connection and try again.");
                 } else if (error instanceof TypeError && error.message.includes("CORS")) {
                     console.error("CORS Error. Check your server configuration.");
-                    resultText.innerText += " CORS error. Please check your server configuration.";
+                    displayError("CORS error. Please check your server configuration.");
                 } else {
-                    resultText.innerText += `Error: ${error.message || "An unknown error occurred."}`;
+                    displayError(`Error: ${error.message || "An unknown error occurred."}`);
                 }
             }
         } finally {
