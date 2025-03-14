@@ -6,7 +6,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <!-- Bootstrap 5 CSS (CDN) -->
-    <title>Local LLM Chat</title>
+    <title>Personal GPT Chat UI</title>
     <link href="http://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
     <link href="http://getbootstrap.com/docs/5.3/assets/css/docs.css" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
@@ -58,10 +58,10 @@
 
 </head>
 
-<body class="bg-white text-dark min-vh-100 d-flex align-items-center justify-content-center">
-    <div class="col-sm-10 col-md-8 col-lg-8 col-xl-8 p-4 rounded bg-light">
+<body class="bg-dark text-white min-vh-100 d-flex align-items-center justify-content-center">
+    <div class="col-sm-10 col-md-8 col-lg-8 col-xl-8 p-4 rounded bg-dark text-white">
         <h1 class="display-4 font-weight-bold mb-5">
-            Local LLM Chat
+            Personal GPT Chat UI
         </h1>
         <div id="errorBanner" class="alert alert-danger text-center" style="display: none;">
         </div>
@@ -125,6 +125,8 @@
     const modelDropdownBtn = document.getElementById("modelDropdown"); // Dropdown button element
     const sysPrompt = document.getElementById("sysPromptInput");
     const tokensStatus = document.getElementById("tokensStatus");
+
+    let trailer = '';
 
     // default system prompt
     sysPrompt.value = `You are an advanced AI assistant, skilled in providing accurate, insightful, and context-aware responses. Your knowledge is vast, up-to-date, and specialized in multiple domains, including but not limited to technology, business, science, philosophy, and creative writing. You can generate well-structured text, analyze complex ideas, and adapt your tone and style based on the user's needs.
@@ -388,7 +390,7 @@ Your Limitations and Transparency:
                 }
             } else {
                 if (resultText.innerText)
-                    resultText.innerHTML += '<br/><br/>';
+                    resultText.innerHTML += '<br/>';
             }
 
             const reader = response.body.getReader();
@@ -396,8 +398,9 @@ Your Limitations and Transparency:
 
             let startTime = performance.now();
             let totalTokens = 0;
-            if (resultText.innerText.length > 0)
-                resultText.innerHTML += '<br/><br/>';
+            // if (resultText.innerText.length > 0)
+            //     resultText.innerHTML += '<br/><br/>';
+            resultText.innerHTML += trailer;
             let message_content = '';
             while (true) {
                 const { done, value } = await reader.read();
@@ -452,6 +455,7 @@ Your Limitations and Transparency:
         } finally {
             // Enable the generate button and disable the stop button
             controller = null;
+            trailer = '<hr/>';
         }
     }
 
