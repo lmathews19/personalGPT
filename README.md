@@ -1,15 +1,18 @@
-# Local LLM Chat
+# Chat UI for Ollama-based Local LLMs
 
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## Overview
 
-Local Personal GPT is an experimental project designed to provide a customizable, offline conversational AI experience. It leverages Ollama and user-selected local Large Language Models (LLMs) to enable private and personalized interactions. This project empowers users to choose and manage their preferred LLMs directly, ensuring data privacy and control.
+Personal LLM Chat UI is a very simple way to chat with Ollama-based models. It leverages Ollama and user-selected local Large Language Models (LLMs) to enable private and personalized interactions. This project empowers users to choose and manage their preferred LLMs directly, ensuring data privacy and control.
 
 **Key Features:**
 
-* **Does not have a Server Component:** Lightning-fast chat with your Ollama instance—experience ultra-low latency compared to other chat clients! 
-* **Edit Historical Context:** Rewrite history! Effortlessly edit past chat context for a more flexible conversation experience. 
+* **Very easy to start:** Download the Index.html file and place it in your favorite web server or use the one suggested below.
+* **Support for a system prompt:** Modify the system prompt as you see fit. ([https://promptengineering.org/system-prompts-in-large-language-models/](https://promptengineering.org/system-prompts-in-large-language-models/)).
+* **Use any local Ollama LLMs:** Lets you select any model pulled from Ollama.
+* **Use a remote Ollama endpoint:** You may run it on a device different from where Ollama is. Simply change the URL in index.html.
+* **Edit Historical Context:** Rewrite history! Effortlessly edit past chat context, including LLM's response, for a more flexible conversation experience. 
 * **Offline Functionality:** Operates entirely locally, eliminating the need for internet connectivity.
 * **Customizable LLM Selection:** Users can select and utilize their preferred LLMs installed through Ollama.
 * **Privacy-Focused:** Keeps all data and interactions within the user's local environment.
@@ -30,6 +33,8 @@ Follow these steps to set up and run Local Personal GPT:
     * Download and install Ollama from the official website ([https://ollama.ai/](https://ollama.ai/)).
     * Download the desired local LLMs using Ollama.
         * Example: `ollama pull llama3.2`
+    * Simply double-click to start the UI
+         
 
 2.  **Install http-server:**
     * Open your terminal and run the following command to install `http-server` globally:
@@ -39,10 +44,11 @@ Follow these steps to set up and run Local Personal GPT:
 3.  **Start the http-server:**
     * Open your terminal and run the following command to start `http-server`:
         ```bash
+        cd <folder where you placed the index.html file>
         http-server
         ```
 4.  **Start using your personal LLM Chat:**
-    * In your favorite browser, open `http://localhost`
+    * In your favorite browser, open `http://localhost:8080`. If 8080 is in use, it may pick the next available port - 8081 and so on.
 
 ## Future Enhancements
 
