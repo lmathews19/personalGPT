@@ -49,6 +49,7 @@
             /* Adjust the position of the icon */
             transform: translateY(-50%);
             cursor: pointer;
+            color: black;
         }
 
         .btn-gap {
@@ -73,8 +74,8 @@
                 Select Model
             </button>
             <ul class="dropdown-menu" aria-labelledby="modelDropdown" role="menu">
-                <li role="presentation"><a role="menuitem" class="dropdown-item" href="#" data-model="1">These will be
-                        replaced with the list below</a></li>
+                <li role="presentation"><a role="menuitem" class="dropdown-item" href="#" data-model="1">No models to
+                        load</a></li>
             </ul>
         </div>
 
@@ -90,7 +91,7 @@
 
         <div class="userInputWrapper">
             <input type="text" id="userPromptInput" class="form-control form-control-lg mt-4"
-                placeholder="Enter your text here.">
+                placeholder="Say or ask something....">
             <i id="editContextBtn" class="fa fa-edit"></i>
         </div>
 
@@ -104,7 +105,7 @@
 
         <div class="d-flex justify-content-center mt-4">
             <button id="generateBtn"
-                class="btn-gap btn btn-dark btn-lg w-50 mr-2 disabled-opacity-75 disabled:cursor-not-allowed">
+                class="btn-gap btn btn-dark btn-outline-light btn-lg w-50 mr-2 disabled-opacity-75 disabled:cursor-not-allowed">
                 Generate
             </button>
             <button id="clearBtn" class="btn btn-outline-danger btn-lg w-50 ml-2">
@@ -116,13 +117,14 @@
 
 <script>
 
-    const MODELS_JSON_URL = "http://localhost:11434/api/tags";
-    const API_URL = "http://127.0.0.1:11434/api/chat";//"https://api.openai.com/v1/chat/completions"; //use this if you choose to use an OpenAI model
+    const MODELS_JSON_URL = "http://127.0.0.1:11434/api/tags";
+    const API_URL = "http://127.0.0.1:11434/api/chat";
+    //"https://api.openai.com/v1/chat/completions"; //use this if you choose to use an OpenAI model; if you do, you will also need a key and some minor code changes 
     const userPromptInput = document.getElementById("userPromptInput");
     const generateBtn = document.getElementById("generateBtn");
     const resultText = document.getElementById("resultText");
     const clearBtn = document.getElementById("clearBtn");
-    const modelDropdownBtn = document.getElementById("modelDropdown"); // Dropdown button element
+    const modelDropdownBtn = document.getElementById("modelDropdown");
     const sysPrompt = document.getElementById("sysPromptInput");
     const tokensStatus = document.getElementById("tokensStatus");
 
@@ -180,25 +182,36 @@ Your Limitations and Transparency:
     });
 
     async function fetchModels() {
+        let errorEncountered = false;
         try {
             const response = await fetch(MODELS_JSON_URL);
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-            models = await response.json();
-            const sortedModels = models.models.sort((a, b) => {
-                if (a.name < b.name) return -1;
-                if (a.name > b.name) return 1;
-                return 0;
-            });
-            models.models = sortedModels;
+            try {
+                models = await response.json();
+                const sortedModels = models.models.sort((a, b) => {
+                    if (a.name < b.name) return -1;
+                    if (a.name > b.name) return 1;
+                    return 0;
+                });
+                models.models = sortedModels;
 
-            if (!models.models.length)
-                displayError("No Ollama models may be installed. Please install Ollama and pull atleast one LLM model.");
+                if (!models.models.length)
+                    displayFatalError("No Ollama models installed. Please install Ollama and pull atleast one LLM model.");
+            } catch (error) {
+                console.error(error);
+                displayFatalError("No Ollama models installed. Run your first model at the command prompt: \"ollama run llama3.2\" and refresh this page.");
+            }
         } catch (error) {
-            console.error("Error fetching models:", error);
-            models = {};
+            errorEncountered = true;
+            displayFatalError("Ollama is not installed, is unreachable from here, or is not running.");
+        } finally {
+            if (!errorEncountered && !models) {
+                models.models.push({ name: "No models available" });
+            }
         }
+
     }
 
     function toggleGenerateStop() {
@@ -224,9 +237,11 @@ Your Limitations and Transparency:
         //sysPrompt.value = "You are helpful assistant";//"You will only answer questions that pertain to Python programming language. And politely decline to say anything other than that.";
 
         fetchModels().then(() => {
-            selectedModel = "granite3.1-moe:3b-instruct-q8_0";//firstModelKey?.name;
-            modelDropdownBtn.textContent = selectedModel;
-            populateDropdown2();
+            if (models && models.models && models.models.length > 0) {
+                selectedModel = models.models[0].name;//"granite3.1-moe:3b-instruct-q8_0";
+                modelDropdownBtn.textContent = selectedModel;
+                populateDropdown2();
+            }
         });
     }
 
@@ -306,6 +321,7 @@ Your Limitations and Transparency:
         addMessageToContext("user", userPromptInput.value);
 
         try {
+            conversationContext[0].content = sysPrompt.value;
             await streamCompletionFromLocalLLM(conversationContext, selectedModel, resultText);
         } catch (error) {
             displayError("Error occurred while generating. " + error);
@@ -362,9 +378,7 @@ Your Limitations and Transparency:
         const requestBody = {
             messages: messages,
             model: model,
-            // "options": {
-            //     "num_ctx": 32768
-            // }
+            keep_alive: 1800,
         };
 
         // Create a new AbortController instance
@@ -457,6 +471,12 @@ Your Limitations and Transparency:
             controller = null;
             trailer = '<hr/>';
         }
+    }
+
+    function displayFatalError(message) {
+        const errorBanner = document.getElementById('errorBanner');
+        errorBanner.textContent = message;
+        errorBanner.style.display = 'block';
     }
 
     function displayError(message) {
